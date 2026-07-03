@@ -150,7 +150,7 @@ python visualize.py       # generates curve_fit.png
 
 ![Fitted curve vs observed data — θ=30°, M=0.03, X=55](curve_fit.png)
 
-The curve `x ∈ [59.61, 109.23]` and `y ∈ [46.01, 69.69]` matches the data range `x ∈ [59.66, 109.23]`, `y ∈ [46.03, 69.69]` almost perfectly — confirming the parameters are correct.
+The curve `x ∈ [59.61, 109.23]` and `y ∈ [46.01, 69.69]` matches the data range `x ∈ [59.66, 109.23]`, `y ∈ [46.03, 69.69]` almost perfectly confirming the parameters are correct.
 
 The optimization converged to **θ = π/6 (30°), M = 0.03, and X = 55** with a final nearest-point **L1 loss of 0.00006**, indicating an excellent fit to the dataset.
 
