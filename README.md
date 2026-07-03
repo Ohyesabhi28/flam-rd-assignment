@@ -152,7 +152,7 @@ python visualize.py       # generates curve_fit.png
 
 The curve `x ∈ [59.61, 109.23]` and `y ∈ [46.01, 69.69]` matches the data range `x ∈ [59.66, 109.23]`, `y ∈ [46.03, 69.69]` almost perfectly — confirming the parameters are correct.
 
-The **nearest-point L1 loss = 0.00006** (mean absolute deviation per point after 877s of global optimization) represents an extremely tight fit. The parameters converge to suspiciously clean values:
+The optimization converged to **θ = π/6 (30°), M = 0.03, and X = 55** with a final nearest-point **L1 loss of 0.00006**, indicating an excellent fit to the dataset.
 
 | Parameter | Optimized | Clean Form | Status |
 |-----------|-----------|------------|--------|
