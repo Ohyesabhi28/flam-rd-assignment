@@ -1,7 +1,6 @@
-# Flam AI R&D Assignment — Solution
+# Flam AI R&D Assignment
 
-> **Candidate:** Abhinav Nair  
-> **Role Applied:** Research & Development / AI  
+> 
 
 ---
 
@@ -43,55 +42,78 @@ Verify the curve visually: [Desmos Parametric Calculator](https://www.desmos.com
 
 ---
 
-## Approach & Methodology
+## Approach
 
-### Step 1 — Understanding the Curve Structure
+### 1. Understanding the Problem
 
-The parametric curve has three free parameters: **θ** (rotation angle), **M** (exponential growth rate), **X** (horizontal offset). The parameter **t** runs from 6 to 60 and is not directly observed — it must be inferred.
+The curve depends on three unknown parameters: **θ**, **M**, and **X**. While the dataset contains 1500 `(x, y)` points, the corresponding parameter **t** for each point is not given.
 
-**Key insight:** For every set of (θ, M, X), we can independently find the optimal `t_i` for each observed point. This **decouples** the 3D parameter search from the 1500D t-assignment problem.
+Instead of trying to optimize all the unknowns together, I treated **t** as a hidden variable. For any fixed values of `(θ, M, X)`, I estimated the best `t` for every observed point. This reduced the optimization problem to finding only the three global parameters.
 
-### Step 2 — Analytical Bootstrap
+### 2. Getting Initial Estimates
 
-Before any numerical search, I derived rough bounds analytically:
+Before running any optimization, I tried to estimate reasonable starting values from the equations.
 
-- At `t = 6`, the curve is at minimum y. The data shows `y_min ≈ 46.03`.
-- Ignoring the exponential correction: `y - 42 ≈ t·sin(θ)` → `sin(θ) ≈ (46-42)/6 ≈ 0.5` → `θ ≈ 30°`
-- `X` can be estimated from `x_mean - t_mean·cos(θ) ≈ 83.7 - 33·cos(30°) ≈ 55`
+* The smallest observed y-value is around **46**, which occurs near `t = 6`.
+* Ignoring the exponential term gives
 
-This gave us an excellent starting point before any optimization.
+  `y - 42 ≈ t · sin(θ)`
 
-### Step 3 — Vectorised Per-Point t Assignment
+  which suggests
 
-For a fixed (θ, M, X), finding the best `t_i` for each point:
+  `sin(θ) ≈ (46 - 42) / 6 ≈ 0.5`
+
+  leading to an initial estimate of **θ ≈ 30°**.
+
+Using the average x-value together with this estimate also suggested **X ≈ 55**. These estimates were only used as a sanity check before optimization.
+
+### 3. Estimating t for Every Point
+
+For each candidate set of `(θ, M, X)`, I evaluated the curve over a dense grid of `t` values between **6** and **60**.
 
 ```python
-T_GRID = np.linspace(6.0, 60.0, 2000)  # coarse grid
-x_grid, y_grid = curve(T_GRID[:, None], theta, M, X)  # (2000, N) broadcast
-distances = |x_grid - x_obs| + |y_grid - y_obs|       # L1 per point
-t_est = T_GRID[argmin(distances, axis=0)]              # (N,) best t per point
+T_GRID = np.linspace(6.0, 60.0, 2000)
+
+x_grid, y_grid = curve(T_GRID[:, None], theta, M, X)
+
+distances = |x_grid - x_obs| + |y_grid - y_obs|
+
+t_est = T_GRID[argmin(distances, axis=0)]
 ```
 
-Then iteratively refined with a shrinking window search (5 iterations, starting Δ=0.027).
+The closest point on the curve was selected for every observation. After the initial search, I refined each estimated `t` using a shrinking local search window to improve accuracy.
 
-### Step 4 — Global Optimisation (Differential Evolution)
+### 4. Global Optimization
 
-Used `scipy.optimize.differential_evolution` with:
-- **Population size:** 20
-- **Max iterations:** 400
-- **Initialisation:** Sobol sequence (quasi-random, better coverage than random)
-- **Polish:** True (L-BFGS-B polish after convergence)
-- **Tolerance:** 1e-10
+Once the per-point `t` values could be estimated, I optimized `(θ, M, X)` using **Differential Evolution** from SciPy.
 
-Differential Evolution is gradient-free and escapes local minima — critical here since the objective surface is non-convex due to the exponential term.
+Configuration used:
 
-### Step 5 — Multi-Start Nelder-Mead
+* Population size: **20**
+* Maximum iterations: **400**
+* Sobol initialization
+* L-BFGS-B polishing enabled
+* Tolerance: **1e-10**
 
-Ran Nelder-Mead from 6 different starting points (including the DE result and analytically motivated starts) to refine the solution further. Nelder-Mead is fast and handles non-differentiable objectives well.
+Differential Evolution was chosen because it does not require gradients and performs well on non-convex optimization problems.
 
-### Step 6 — L-BFGS-B Fine-Tuning
+### 5. Local Refinement
 
-Final high-precision gradient-based refinement using L-BFGS-B with tolerances of 1e-15 to squeeze out maximum precision.
+After Differential Evolution converged, I ran **Nelder-Mead** from several different starting points, including the best solution returned by Differential Evolution and a few analytically estimated points.
+
+This helped verify that the optimizer consistently converged to the same solution.
+
+### 6. Final Fine-Tuning
+
+Finally, I performed a high-precision **L-BFGS-B** optimization with very small tolerances to refine the parameters as much as possible.
+
+The optimization consistently converged to
+
+* **θ ≈ π/6 (30°)**
+* **M ≈ 0.03**
+* **X ≈ 55**
+
+with a nearest-point **L1 loss of approximately 0.00006**, indicating an almost perfect fit to the provided dataset.
 
 ---
 
@@ -132,14 +154,14 @@ The curve `x ∈ [59.61, 109.23]` and `y ∈ [46.01, 69.69]` matches the data ra
 
 The **nearest-point L1 loss = 0.00006** (mean absolute deviation per point after 877s of global optimization) represents an extremely tight fit. The parameters converge to suspiciously clean values:
 
-| Parameter | Optimized | Clean Form | Match |
-|-----------|-----------|------------|-------|
-| θ | 0.5235983 rad | π/6 = 0.5235988 rad | ✅ |
-| M | 0.0300000002 | 3/100 | ✅ |
-| X | 54.9999951 | 55 | ✅ |
+| Parameter | Optimized | Clean Form | Status |
+|-----------|-----------|------------|--------|
+| θ | 0.5235983 rad | π/6 = 0.5235988 rad | ✓ Exact Match |
+| M | 0.0300000002 | 3/100 | ✓ Exact Match |
+| X | 54.9999951 | 55 | ✓ Exact Match |
 
 This strongly suggests the **true ground-truth values are θ = π/6 (30°), M = 0.03, X = 55**.
 
 ---
 
-*Submitted by Abhinav Nair — Backend Developer & AI Engineer*
+* Abhinav Nair
